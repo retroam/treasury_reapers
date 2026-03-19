@@ -4,56 +4,77 @@
 
 ### Overview
 
-This is an **Arena Agent** config-only project for the [Sentient AGI Arena](https://github.com/sentient-agi) "grounded-reasoning" competition. It contains no custom Python source code — all agent logic comes from pre-built harness agents orchestrated by the `arena` CLI via `arena.yaml`.
+This is an **Arena Agent** config-only project for the Sentient AGI Arena "grounded-reasoning" competition. It contains no custom Python source code — all agent logic comes from pre-built harness agents orchestrated by the `arena` CLI via `arena.yaml`.
 
 ### Key files
 
 - `arena.yaml` — Agent configuration (competition, model, environment settings)
 - `pyproject.toml` — Python project metadata; declares `arena-sdk` dependency
+- `cli.tar` — Arena CLI distribution (wheels + install script)
 
-### Runtime dependencies
+### Development environment setup
 
-| Dependency | Purpose | Status |
-|---|---|---|
-| Python 3.11 | Required runtime (see `.python-version`) | Installed via `uv python install 3.11` |
-| `uv` | Package manager | Installed at `~/.local/bin/uv` |
-| Docker | Runs agent tasks in isolated containers | Installed; requires `sudo dockerd` to start daemon |
-| `arena` CLI | Orchestrates test runs, submissions | **Not publicly available** — from private `sentient-agi/arena` repo |
-| `arena-sdk` | Python SDK dependency | **Not publicly available** — `uv sync` fails because `github.com/sentient-agi/arena.git` is inaccessible |
-| `OPENROUTER_API_KEY` | LLM inference via OpenRouter | Must be set as env var (configured as a Cursor secret) |
+See `README.md` for standard arena commands (`arena doctor`, `arena test`, `arena submit`).
 
-### Docker in Cloud Agent VM
+The arena CLI is installed from `cli.tar` via its bundled `install.sh` to `~/.arena/`. Add `~/.arena/bin` to `PATH`. Authenticate with `arena auth login --token "$ARENA_CLI_TOKEN"`.
 
-Docker runs inside a Firecracker VM, requiring special setup:
+### Docker in Cloud Agent VM (critical gotcha)
 
-1. `fuse-overlayfs` storage driver (`/etc/docker/daemon.json`)
-2. `iptables-legacy` alternatives
-3. Start daemon with `sudo dockerd &>/tmp/dockerd.log &`
+Docker runs in a nested Firecracker VM requiring:
 
-### Gotchas
+1. **fuse-overlayfs** storage driver in `/etc/docker/daemon.json`
+2. **iptables-legacy** alternatives (`update-alternatives --set iptables /usr/sbin/iptables-legacy`)
+3. Start daemon: `sudo dockerd &>/tmp/dockerd.log &`
+4. Fix socket permissions: `sudo chmod 666 /var/run/docker.sock`
+5. **cgroup v2 workaround**: The `deploy.resources.limits` (memory/CPU) in harbor's `docker-compose-base.yaml` causes `cannot enter cgroupv2 ... with domain controllers -- it is in threaded mode`. Fix by removing the `deploy:` block from `~/.arena/venv/lib/python3.*/site-packages/harbor/environments/docker/docker-compose-base.yaml`. This must be reapplied after `arena pull` auto-updates the CLI.
 
-- `uv sync` will fail until the `sentient-agi/arena` Git repository becomes publicly accessible or credentials are configured. The venv can still be created with `uv venv --python 3.11`.
-- The `arena` CLI referenced in `README.md` (`arena auth login`, `arena doctor`, `arena test`) is **not** the `cli-arena` PyPI package. They are different tools.
-- No lint, test, or build commands exist in this project — it is purely configuration.
-- The `pyproject.toml` uses `[tool.uv.sources]` for git-based `arena-sdk`; standard `pip install` cannot resolve it.
+### Arena CLI auto-update shebang bug
+
+When `arena pull` auto-updates the CLI (e.g. 0.1.0 to 0.2.8), it renames `~/.arena/venv.new` to `~/.arena/venv` but the shebang in `~/.arena/venv/bin/arena` still references `venv.new`. Fix with:
+```bash
+sed -i 's|venv\.new|venv|g' ~/.arena/venv/bin/arena
+```
+
+### Model format for OpenRouter
+
+The model in `arena.yaml` must be `openrouter/<model_id>`, e.g. `openrouter/qwen/qwen3-coder`. Using just `qwen/qwen3-coder` fails with "Unknown provider qwen" because the harness parses the first segment as the API provider. See the supported providers list in `harbor/agents/installed/opencode.py`.
+
+### Required secrets
+
+| Secret | Purpose |
+|---|---|
+| `OPENROUTER_API_KEY` | LLM inference via OpenRouter |
+| `ARENA_CLI_TOKEN` | Arena platform auth (used with `arena auth login --token`) |
 
 ### Quick reference
 
 ```bash
-# Create/refresh Python 3.11 venv
-uv venv --python 3.11 --clear
+# Install arena CLI from bundled tar
+cd /workspace && mkdir -p .arena-cli-extract && tar xf cli.tar -C .arena-cli-extract
+bash .arena-cli-extract/install.sh
+export PATH="$HOME/.arena/bin:$PATH"
 
-# Attempt dependency install (requires arena repo access)
-uv sync
+# Authenticate
+arena auth login --token "$ARENA_CLI_TOKEN"
 
-# Start Docker daemon (Cloud VM)
-sudo dockerd &>/tmp/dockerd.log &
+# Pull sample tasks
+arena pull
 
-# Validate arena.yaml
-python -c "import yaml; yaml.safe_load(open('arena.yaml'))"
+# Fix harbor compose cgroup issue (after each CLI update)
+sed -i '/deploy:/,/memory:.*/d' ~/.arena/venv/lib/python3.*/site-packages/harbor/environments/docker/docker-compose-base.yaml
 
-# Run arena commands (requires arena CLI)
+# Fix shebang if arena command stops working after auto-update
+sed -i 's|venv\.new|venv|g' ~/.arena/venv/bin/arena
+
+# Validate setup
 arena doctor
-arena test --dry-run
-arena test --smoke
+
+# Run tests
+arena test --dry-run     # validate config only
+arena test --smoke       # run 1 task
+arena test --n 3         # run 3 tasks
 ```
+
+### No lint/test/build
+
+This project has no lint configuration, automated tests, or build step. Validation is done via `arena doctor` and `arena test`.
