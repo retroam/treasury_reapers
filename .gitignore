@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.arena/runs/
+.arena/samples/
+.idea/
+.vscode/
+*.swp
+
+# Arena CLI
+arena-cli-latest*
+
+# Secrets
+.env
+.env.*
+
+# Build artifacts
+build/
+dist/
+*.whl
+*.egg
+
+# Coverage
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
