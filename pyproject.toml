@@ -10,3 +10,6 @@ dependencies = [
 
 [tool.uv.sources]
 arena-sdk = { git = "https://github.com/sentient-agi/arena.git", subdirectory = "projects/arena_sdk" }
+
+[dependency-groups]
+notebook = ["jupyter", "ipykernel"]
