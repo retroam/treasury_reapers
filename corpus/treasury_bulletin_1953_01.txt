@@ -1,0 +1,22 @@
+UNITED STATES TREASURY BULLETIN
+January 1953  |  Volume 39, Number 1
+
+PUBLIC DEBT OPERATIONS
+
+The following table summarizes selected holdings for illustration of the
+grounded-reasoning pipeline demo. Amounts are in millions of dollars.
+
+Table 4.—SELECTED HOLDINGS FOR DEMONSTRATION PURPOSES
+(Millions of dollars)
+
+  Category                               Outstanding
+  ------------------------------------   -----------
+  Alpha                                      1,250
+  Beta                                        (450)
+  Gamma                                        200
+  Total (not a data row)                       800
+
+Notes:
+  (1) Parentheses denote negative amounts per bulletin convention.
+  (2) The "Total" line is a subtotal row and must not be double-counted
+      when summing individual categories.
